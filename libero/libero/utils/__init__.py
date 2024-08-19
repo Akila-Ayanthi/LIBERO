@@ -18,7 +18,8 @@ def get_path_dict(root_location=os.path.dirname(os.path.abspath(__file__))):
     init_states_default_path = os.path.join(benchmark_root_path, "./init_files")
 
     # This is a default path for localizing all the default datasets
-    dataset_default_path = os.path.join(benchmark_root_path, "../datasets")
+    # dataset_default_path = os.path.join(benchmark_root_path, "../datasets")
+    dataset_default_path = '/datasets/work/d61-csirorobotics/source/LIBERO'
 
     return {
         "benchmark_root": benchmark_root_path,

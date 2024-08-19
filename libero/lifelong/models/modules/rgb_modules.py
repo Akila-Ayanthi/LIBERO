@@ -121,7 +121,9 @@ class SpatialProjection(nn.Module):
         self.projection = nn.Linear(num_kp * 2, out_dim)
 
     def forward(self, x):
+        # print("before spatial softnax", x.shape)
         out = self.spatial_softmax(x)
+        # print("after spatial softnax", x.shape)
         out = self.projection(out)
         return out
 
@@ -221,16 +223,20 @@ class ResnetEncoder(nn.Module):
         self.projection_layer = SpatialProjection(output_shape[1:], output_size)
         self.output_shape = self.projection_layer(y).shape
 
-    def forward(self, x, langs=None):
+    def forward(self, x, langs=None, returnt=None):
+        # print("x", x.shape)
         h = self.resnet18_base(x)
+        # print("h1", h.shape)
 
         h = self.block_1(h)
         if langs is not None and self.language_fusion != "none":  # FiLM layer
             B, C, H, W = h.shape
             beta, gamma = torch.split(
-                self.lang_proj1(langs).reshape(B, C * 2, 1, 1), [C, C], 1
+                self.lang_proj1(langs).reshape(B, C * 2, 1, 1), [C, C], 1 #
             )
-            h = (1 + gamma) * h + beta
+            h = (1 + gamma) * h + beta #scaling and shifting of the image features (modulation) based on the text embeddings
+        # print("h2", h.shape)
+
 
         h = self.block_2(h)
         if langs is not None and self.language_fusion != "none":  # FiLM layer
@@ -239,6 +245,7 @@ class ResnetEncoder(nn.Module):
                 self.lang_proj2(langs).reshape(B, C * 2, 1, 1), [C, C], 1
             )
             h = (1 + gamma) * h + beta
+        # print("h3", h.shape)
 
         h = self.block_3(h)
         if langs is not None and self.language_fusion != "none":  # FiLM layer
@@ -247,16 +254,24 @@ class ResnetEncoder(nn.Module):
                 self.lang_proj3(langs).reshape(B, C * 2, 1, 1), [C, C], 1
             )
             h = (1 + gamma) * h + beta
+        # print("h4", h.shape)
 
         h = self.block_4(h)
         if langs is not None and self.language_fusion != "none":  # FiLM layer
+            # print("modulating text input")
             B, C, H, W = h.shape
             beta, gamma = torch.split(
                 self.lang_proj4(langs).reshape(B, C * 2, 1, 1), [C, C], 1
             )
             h = (1 + gamma) * h + beta
+        # print("h5", h.shape)
+# 
+
+        if returnt=='feats':
+            return h
 
         h = self.projection_layer(h)
+        # print("after projection", h.shape)
         return h
 
     def output_shape(self, input_shape, shape_meta):

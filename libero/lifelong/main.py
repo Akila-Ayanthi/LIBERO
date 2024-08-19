@@ -7,6 +7,7 @@ import multiprocessing
 import pprint
 import time
 from pathlib import Path
+import warnings
 
 import hydra
 import numpy as np
@@ -33,6 +34,7 @@ from libero.lifelong.utils import (
     get_task_embs,
 )
 
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="thop.profile")
 
 @hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(hydra_cfg):
@@ -54,7 +56,7 @@ def main(hydra_cfg):
     control_seed(cfg.seed)
 
     # prepare lifelong learning
-    cfg.folder = cfg.folder or get_libero_path("datasets")
+    cfg.folder = '/datasets/work/d61-csirorobotics/source/LIBERO' #cfg.folder or get_libero_path("datasets")
     cfg.bddl_folder = cfg.bddl_folder or get_libero_path("bddl_files")
     cfg.init_states_folder = cfg.init_states_folder or get_libero_path("init_states")
 
@@ -132,7 +134,7 @@ def main(hydra_cfg):
     cfg.shape_meta = shape_meta
 
     if cfg.use_wandb:
-        wandb.init(project="libero", config=cfg)
+        wandb.init(project="libero", config=cfg, entity='akila_ayanthi')
         wandb.run.name = cfg.experiment_name
 
     result_summary = {
@@ -247,7 +249,7 @@ def main(hydra_cfg):
                     ]
                     wandb.run.summary["fwd_transfer_success"] = result_summary["S_fwd"]
                     wandb.run.summary["fwd_transfer_loss"] = result_summary["L_fwd"]
-                    wandb.run.summary.update()
+                    # wandb.run.summary.update()
 
                 print(
                     f"[info] train time (min) {(t1-t0)/60:.1f} "

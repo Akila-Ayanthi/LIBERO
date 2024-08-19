@@ -10,7 +10,7 @@ defaults:
   - test: null
 
 seed: 10000
-use_wandb: false
+use_wandb: true
 wandb_project: "lifelong learning"
 folder: null # use default path
 bddl_folder: null # use default path
@@ -21,4 +21,4 @@ task_embedding_format: "bert"
 task_embedding_one_hot_offset: 1
 pretrain: false
 pretrain_model_path: ""
-benchmark_name: "LIBERO_SPATIAL"
+benchmark_name: "LIBERO_OBJECT"

@@ -16,3 +16,9 @@ logs/
 *.mp4
 libero.egg-info/
 .vscode/
+*.out
+libero-object-heatmaps/
+libero-spatial-visualisations/
+libero_object_visualisations/
+libero_spatial_visualisations/
+bert-base-cased/

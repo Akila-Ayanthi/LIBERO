@@ -1,2 +1,2 @@
 algo: ER
-n_memories: 1000
+n_memories: 500 #DEFAULT 1000

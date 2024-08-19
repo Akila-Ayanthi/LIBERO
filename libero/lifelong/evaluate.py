@@ -12,6 +12,8 @@ import time
 import torch
 import wandb
 import yaml
+import multiprocessing
+
 from easydict import EasyDict
 from hydra.utils import get_original_cwd, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
@@ -131,7 +133,9 @@ def main():
         if not path.is_dir():
             continue
         try:
-            folder_id = int(str(path).split("run_")[-1])
+            # folder_id = int(str(path).split("run_")[-1])
+            folder_id = 1
+            print("folder id", folder_id)
             if folder_id > experiment_id:
                 experiment_id = folder_id
         except BaseException:
@@ -141,6 +145,7 @@ def main():
         sys.exit(0)
 
     run_folder = os.path.join(experiment_dir, f"run_{experiment_id:03d}")
+    print("run folder", run_folder)
     try:
         if args.algo == "multitask":
             model_path = os.path.join(run_folder, f"multitask_model_ep{args.ep}.pth")
@@ -156,7 +161,7 @@ def main():
         print(f"[error] cannot find the checkpoint at {str(model_path)}")
         sys.exit(0)
 
-    cfg.folder = get_libero_path("datasets")
+    cfg.folder = '/datasets/work/d61-csirorobotics/source/LIBERO' #get_libero_path("datasets")
     cfg.bddl_folder = get_libero_path("bddl_files")
     cfg.init_states_folder = get_libero_path("init_states")
 
@@ -187,26 +192,34 @@ def main():
     task_embs = get_task_embs(cfg, descriptions)
     benchmark.set_task_embs(task_embs)
 
-    task = benchmark.get_task(args.task_id)
+    gsz = cfg.data.task_group_size
 
-    ### ======================= start evaluation ============================
+    # for task_id in args.task_id:
+    task_id = args.task_id
+    task = benchmark.get_task(task_id)
+    
+
+# ======================= start evaluation ============================
+
+    print(f"===============Evaluating on task {task_id} with description {descriptions[task_id]}==============================")
+    # print("len of features", len(tsne_features_agent), len(tsne_labels))
 
     # 1. evaluate dataset loss
     try:
         dataset, shape_meta = get_dataset(
             dataset_path=os.path.join(
-                cfg.folder, benchmark.get_task_demonstration(args.task_id)
+                cfg.folder, benchmark.get_task_demonstration(task_id)
             ),
             obs_modality=cfg.data.obs.modality,
             initialize_obs_utils=True,
             seq_len=cfg.data.seq_len,
         )
         dataset = GroupedTaskDataset(
-            [dataset], task_embs[args.task_id : args.task_id + 1]
+            [dataset], task_embs[task_id : task_id + 1]
         )
     except:
         print(
-            f"[error] failed to load task {args.task_id} name {benchmark.get_task_names()[args.task_id]}"
+            f"[error] failed to load task {task_id} name {benchmark.get_task_names()[task_id]}"
         )
         sys.exit(0)
 
@@ -218,17 +231,17 @@ def main():
     if args.algo == "multitask":
         save_folder = os.path.join(
             args.save_dir,
-            f"{args.benchmark}_{args.algo}_{args.policy}_{args.seed}_ep{args.ep}_on{args.task_id}.stats",
+            f"{args.benchmark}_{args.algo}_{args.policy}_{args.seed}_ep{args.ep}_on{task_id}.stats",
         )
     else:
         save_folder = os.path.join(
             args.save_dir,
-            f"{args.benchmark}_{args.algo}_{args.policy}_{args.seed}_load{args.load_task}_on{args.task_id}.stats",
+            f"{args.benchmark}_{args.algo}_{args.policy}_{args.seed}_load{args.load_task}_on{task_id}.stats",
         )
 
     video_folder = os.path.join(
         args.save_dir,
-        f"{args.benchmark}_{args.algo}_{args.policy}_{args.seed}_load{args.load_task}_on{args.task_id}_videos",
+        f"{args.benchmark}_{args.algo}_{args.policy}_{args.seed}_load{args.load_task}_on{task_id}_videos",
     )
 
     with Timer() as t, VideoWriter(video_folder, args.save_videos) as video_writer:
@@ -258,7 +271,7 @@ def main():
         dones = [False] * env_num
         steps = 0
         obs = env.set_init_state(init_states_)
-        task_emb = benchmark.get_task_emb(args.task_id)
+        task_emb = benchmark.get_task_emb(task_id)
 
         num_success = 0
         for _ in range(5):  # simulate the physics without any actions
@@ -285,6 +298,15 @@ def main():
                 num_success += int(dones[k])
 
         success_rate = num_success / env_num
+        # L = evaluate_loss(cfg, algo, benchmark, datasets[: task_id + 1])
+        S = evaluate_success(
+                cfg=cfg,
+                algo=algo,
+                benchmark=benchmark,
+                task_ids=list(range((task_id + 1) * gsz)),
+                result_summary=None,
+            )
+        print("Success rate", S)
         env.close()
 
         eval_stats = {
@@ -302,4 +324,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # Set the multiprocessing start method to 'spawn'
+    if multiprocessing.get_start_method(allow_none=True) != "spawn":  
+        multiprocessing.set_start_method("spawn", force=True)
+
     main()

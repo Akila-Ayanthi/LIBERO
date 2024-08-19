@@ -1,6 +1,8 @@
 import robomimic.utils.tensor_utils as TensorUtils
 import torch
 import torch.nn as nn
+import matplotlib.pyplot as plt
+from PIL import Image
 
 from libero.lifelong.models.modules.rgb_modules import *
 from libero.lifelong.models.modules.language_modules import *
@@ -114,10 +116,11 @@ class PerturbationAttention:
     for understanding a control agent.
     """
 
-    def __init__(self, model, image_size=[128, 128], patch_size=[16, 16], device="cpu"):
+    def __init__(self, model, device, image_size=[128, 128], patch_size=[16, 16]):
 
         self.model = model
         self.patch_size = patch_size
+        self.device = device
         H, W = image_size
         num_patches = (H * W) // np.prod(patch_size)
         # pre-compute mask
@@ -138,18 +141,25 @@ class PerturbationAttention:
 
     def __call__(self, data):
         rgb = data["obs"]["agentview_rgb"]  # (B, C, H, W)
+        # rgb = data["obs"]["eye_in_hand_rgb"]
         B, C, H, W = rgb.shape
 
         rgb_ = rgb.unsqueeze(1).repeat(1, self.num_patches, 1, 1, 1)  # (B, np, C, H, W)
         rgb_mean = rgb.mean([2, 3], keepdims=True).unsqueeze(1)  # (B, 1, C, 1, 1)
         rgb_new = (rgb_mean * self.mask) + (1 - self.mask) * rgb_  # (B, np, C, H, W)
+        # print("rgb new", rgb_new)
         rgb_stack = torch.cat([rgb.unsqueeze(1), rgb_new], 1)  # (B, 1+np, C, H, W)
 
         rgb_stack = rearrange(rgb_stack, "b n c h w -> (b n) c h w")
+        # print("rgb stack1", rgb_stack.shape, rgb_stack.dtype)
+        
         res = self.model(rgb_stack).view(B, self.num_patches + 1, -1)  # (B, 1+np, E)
+        # print("model output", res)
         base = res[:, 0].view(B, 1, -1)
         others = res[:, 1:].view(B, self.num_patches, -1)
 
+        # diff = (others - base).pow(2).sum(-1)
+        # print("diff", diff)
         attn = F.softmax(1e5 * (others - base).pow(2).sum(-1), -1)  # (B, num_patches)
         attn_ = attn.view(B, 1, self.nh, self.nw)
         attn_ = (
@@ -158,8 +168,9 @@ class PerturbationAttention:
             .cpu()
             .numpy()
         )
-        return attn_
 
+        return attn_
+        
 
 ###############################################################################
 #
@@ -251,23 +262,28 @@ class BCTransformerPolicy(BasePolicy):
         x = TensorUtils.join_dimensions(x, 1, 2)  # (B, T*num_modality, E)
         x = self.temporal_transformer(x)
         x = x.reshape(*sh)
-        return x[:, :, 0]  # (B, T, E)
+        return x[:, :, 0]  # (B, T, E) #only the first modality's output is taken (maybe because the goal is to acheive the language intructions)
 
     def spatial_encode(self, data):
         # 1. encode extra
-        extra = self.extra_encoder(data["obs"])  # (B, T, num_extra, E)
+        extra = self.extra_encoder(data["obs"]) 
+        if extra.dim() == 3:  # If the tensor has 3 dimensions
+            extra = extra.unsqueeze(1)  # Add a new dimension at index 1 # (B, T, num_extra, E)
+        # print("extra", extra.shape)
 
-        # 2. encode language, treat it as action token
+        # 2. encode language, treat it as action token - it influences / modulates other modalities
         B, T = extra.shape[:2]
         text_encoded = self.language_encoder(data)  # (B, E)
         text_encoded = text_encoded.view(B, 1, 1, -1).expand(
             -1, T, -1, -1
-        )  # (B, T, 1, E)
+        )  # (B, T, 1, E) #The language encoding is replicated across across all timesteps meaning it influences all other modalities and thus treated as an action
+        # print("text encode", text_encoded.shape)
         encoded = [text_encoded, extra]
 
         # 3. encode image
         for img_name in self.image_encoders.keys():
             x = data["obs"][img_name]
+            # print("x shape", x.shape)
             B, T, C, H, W = x.shape
             img_encoded = self.image_encoders[img_name]["encoder"](
                 x.reshape(B * T, C, H, W),
@@ -276,13 +292,22 @@ class BCTransformerPolicy(BasePolicy):
                 .repeat(1, T, 1)
                 .reshape(B * T, -1),
             ).view(B, T, 1, -1)
+            # print("image encoded sjape", img_encoded.shape)
             encoded.append(img_encoded)
         encoded = torch.cat(encoded, -2)  # (B, T, num_modalities, E)
         return encoded
 
-    def forward(self, data):
+    def forward(self, data, returnt='None'):
         x = self.spatial_encode(data)
+
+        if returnt == 'spatial_feats':
+            return x
+        
         x = self.temporal_encode(x)
+
+        if returnt=='feats':
+            return x
+        
         dist = self.policy_head(x)
         return dist
 

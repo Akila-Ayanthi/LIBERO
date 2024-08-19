@@ -43,7 +43,7 @@ def main():
 
     benchmark_root_path = get_libero_path("benchmark_root")
     init_states_default_path = get_libero_path("init_states")
-    datasets_default_path = get_libero_path("datasets")
+    datasets_default_path = '/datasets/work/d61-csirorobotics/source/LIBERO'
     bddl_files_default_path = get_libero_path("bddl_files")
 
     # Check all the files
