@@ -1,6 +1,7 @@
 import os
 import imageio
 import numpy as np
+import cv2
 
 
 class VideoWriter:
@@ -45,8 +46,22 @@ class VideoWriter:
                 original_image = (
                     original_image * (1 - transparency) + blank_image * transparency
                 )
-
+                # # Add step count to the original image
+                # original_image = self.add_step_count_to_frame(original_image.astype(np.uint8), step_count)
                 self.image_buffer[idx].append(original_image.astype(np.uint8))
+
+    def add_step_count_to_frame(self, frame, step_count):
+        """Helper function to overlay the step count on the frame."""
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        color = (255, 255, 255)  # White text
+        thickness = 2
+        position = (10, 30)  # Position of the text on the frame
+
+        text = f"Step: {step_count}"
+        cv2.putText(frame, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
+
+        return frame
 
     def reset(self):
         if self.save_video:

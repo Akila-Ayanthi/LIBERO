@@ -139,36 +139,68 @@ class PerturbationAttention:
         self.H, self.W = H, W
         self.nh, self.nw = nh, nw
 
-    def __call__(self, data):
-        rgb = data["obs"]["agentview_rgb"]  # (B, C, H, W)
-        # rgb = data["obs"]["eye_in_hand_rgb"]
-        B, C, H, W = rgb.shape
+    def __call__(self, data, policy, image_name, model_name):
+        if model_name=='image_encoder':
+            rgb = data["obs"][image_name]  # (B, C, H, W)
+            # rgb = data["obs"]["eye_in_hand_rgb"]
+            B, C, H, W = rgb.shape
 
-        rgb_ = rgb.unsqueeze(1).repeat(1, self.num_patches, 1, 1, 1)  # (B, np, C, H, W)
-        rgb_mean = rgb.mean([2, 3], keepdims=True).unsqueeze(1)  # (B, 1, C, 1, 1)
-        rgb_new = (rgb_mean * self.mask) + (1 - self.mask) * rgb_  # (B, np, C, H, W)
-        # print("rgb new", rgb_new)
-        rgb_stack = torch.cat([rgb.unsqueeze(1), rgb_new], 1)  # (B, 1+np, C, H, W)
+            rgb_ = rgb.unsqueeze(1).repeat(1, self.num_patches, 1, 1, 1)  # (B, np, C, H, W)
+            rgb_mean = rgb.mean([2, 3], keepdims=True).unsqueeze(1)  # (B, 1, C, 1, 1)
+            rgb_new = (rgb_mean * self.mask) + (1 - self.mask) * rgb_  # (B, np, C, H, W)
+            rgb_stack = torch.cat([rgb.unsqueeze(1), rgb_new], 1)  # (B, 1+np, C, H, W)
 
-        rgb_stack = rearrange(rgb_stack, "b n c h w -> (b n) c h w")
-        # print("rgb stack1", rgb_stack.shape, rgb_stack.dtype)
-        
-        res = self.model(rgb_stack).view(B, self.num_patches + 1, -1)  # (B, 1+np, E)
-        # print("model output", res)
-        base = res[:, 0].view(B, 1, -1)
-        others = res[:, 1:].view(B, self.num_patches, -1)
+            rgb_stack = rearrange(rgb_stack, "b n c h w -> (b n) c h w")
+            
+            res = self.model(rgb_stack).view(B, self.num_patches + 1, -1)  # (B, 1+np, E)
+            base = res[:, 0].view(B, 1, -1)
+            others = res[:, 1:].view(B, self.num_patches, -1)
 
-        # diff = (others - base).pow(2).sum(-1)
-        # print("diff", diff)
-        attn = F.softmax(1e5 * (others - base).pow(2).sum(-1), -1)  # (B, num_patches)
-        attn_ = attn.view(B, 1, self.nh, self.nw)
-        attn_ = (
-            F.interpolate(attn_, size=(self.H, self.W), mode="bilinear")
-            .detach()
-            .cpu()
-            .numpy()
-        )
+            attn = F.softmax(1e5 * (others - base).pow(2).sum(-1), -1)  # (B, num_patches)
+            attn_ = attn.view(B, 1, self.nh, self.nw)
+            attn_ = (
+                F.interpolate(attn_, size=(self.H, self.W), mode="bilinear")
+                .detach()
+                .cpu()
+                .numpy()
+            )
 
+        elif model_name=='transformer':
+            rgb = data["obs"][image_name]  # (B, C, H, W)
+            rgb_ = data["obs"]["eye_in_hand_rgb"]
+            B, C, H, W = rgb.shape
+
+            rgb_ = rgb.unsqueeze(1).repeat(1, self.num_patches, 1, 1, 1)  # (B, np, C, H, W)
+            rgb_mean = rgb.mean([2, 3], keepdims=True).unsqueeze(1)  # (B, 1, C, 1, 1)
+            rgb_new = (rgb_mean * self.mask) + (1 - self.mask) * rgb_  # (B, np, C, H, W)
+            rgb_stack = torch.cat([rgb.unsqueeze(1), rgb_new], 1)  # (B, 1+np, C, H, W)
+            rgb_stack = rearrange(rgb_stack, "b n c h w -> (b n) c h w")
+            print("rgb_stack shape", rgb_stack.shape)
+
+            rgb_stack_ = torch.cat([rgb_.squeeze(1), rgb_.squeeze(1)], 0)
+            print("rgb_stack_ shape", rgb_stack_.shape)
+            rgb_stack_ = rearrange(rgb_stack_, "b n c h w -> (b n) c h w")
+            print("rgb_stack_ shape", rgb_stack_.shape)
+
+
+            data['obs'][image_name]=rgb_stack
+            data['obs']['eye_in_hand_rgb'] = rgb_stack_
+            data = policy.preprocess_input(data, train_mode=False)
+            print("data shape", data['obs'][image_name].shape, data['obs']['eye_in_hand_rgb'].shape)
+            res = policy(data, returnt='feats')
+            print("res shape", res.shape)
+
+            base = res[:, 0].view(B, 1, -1)
+            others = res[:, 1:].view(B, self.num_patches, -1)
+
+            attn = F.softmax(1e5 * (others - base).pow(2).sum(-1), -1)  # (B, num_patches)
+            attn_ = attn.view(B, 1, self.nh, self.nw)
+            attn_ = (
+                F.interpolate(attn_, size=(self.H, self.W), mode="bilinear")
+                .detach()
+                .cpu()
+                .numpy()
+            )
         return attn_
         
 
@@ -285,6 +317,8 @@ class BCTransformerPolicy(BasePolicy):
             x = data["obs"][img_name]
             # print("x shape", x.shape)
             B, T, C, H, W = x.shape
+            # print("x.shape", x.shape)
+            # print("task emb shape", data['task_emb'].shape)
             img_encoded = self.image_encoders[img_name]["encoder"](
                 x.reshape(B * T, C, H, W),
                 langs=data["task_emb"]

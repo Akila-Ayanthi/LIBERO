@@ -22,8 +22,8 @@
 # python libero/lifelong/main.py benchmark_name=LIBERO_SPATIAL lifelong=er
 # python libero/lifelong/evaluate.py --benchmark libero_spatial --task_id 9 --algo er --policy bc_transformer_policy --seed 10000 --load_task 0 --device_id 0
 
-python libero/lifelong/evaluate_wtsne.py --benchmark libero_spatial --task_id 0 1 2 3 4 5 6 7 8 9 --algo er --policy bc_transformer_policy --seed 10000 \
-    --load_task 9 --device_id 0 --folder 1
+# python libero/lifelong/evaluate_wtsne.py --benchmark libero_spatial --task_id 0 --algo er --policy bc_transformer_policy --seed 10000 \
+#     --load_task 0 --device_id 0 --folder 1 --save_videos
 
 # python libero/lifelong/evaluate_wtsne.py --benchmark libero_object --task_id 0 1 2 3 4 5 6 7 8 9 --algo er --policy bc_transformer_policy --seed 10000 \
 #     --load_task 7 --device_id 0 --folder 5

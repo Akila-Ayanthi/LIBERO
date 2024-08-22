@@ -1,6 +1,8 @@
 import argparse
 import sys
 import os
+import setproctitle
+
 
 # TODO: find a better way for this?
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -100,6 +102,8 @@ def parse_args():
     parser.add_argument("--load_task", type=int)
     parser.add_argument("--device_id", type=int)
     parser.add_argument("--save-videos", action="store_true")
+    parser.add_argument("--folder", type=int, help="folder with the model to load")
+
     # parser.add_argument('--save_dir',  type=str, required=True)
     args = parser.parse_args()
     args.device_id = "cuda:" + str(args.device_id)
@@ -117,6 +121,10 @@ def parse_args():
 
 
 def main():
+    # Set the process name to 'python'
+    setproctitle.setproctitle('python')
+
+    
     args = parse_args()
     # e.g., experiments/LIBERO_SPATIAL/Multitask/BCRNNPolicy_seed100/
 
@@ -134,7 +142,7 @@ def main():
             continue
         try:
             # folder_id = int(str(path).split("run_")[-1])
-            folder_id = 1
+            folder_id = args.folder
             print("folder id", folder_id)
             if folder_id > experiment_id:
                 experiment_id = folder_id
@@ -161,7 +169,7 @@ def main():
         print(f"[error] cannot find the checkpoint at {str(model_path)}")
         sys.exit(0)
 
-    cfg.folder = '/datasets/work/d61-csirorobotics/source/LIBERO' #get_libero_path("datasets")
+    cfg.folder = '/raid/work/dis023/csirorobotics/source/LIBERO' #'/datasets/work/d61-csirorobotics/source/LIBERO' #get_libero_path("datasets")
     cfg.bddl_folder = get_libero_path("bddl_files")
     cfg.init_states_folder = get_libero_path("init_states")
 
@@ -253,7 +261,7 @@ def main():
             "camera_widths": cfg.data.img_w,
         }
 
-        env_num = 20
+        env_num = 5
         env = SubprocVectorEnv(
             [lambda: OffScreenRenderEnv(**env_args) for _ in range(env_num)]
         )

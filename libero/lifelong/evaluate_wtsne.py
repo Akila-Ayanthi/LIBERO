@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import setproctitle
 
 # TODO: find a better way for this?
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -17,7 +18,7 @@ from sklearn.manifold import TSNE
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import cv2
-
+import copy
 
 from easydict import EasyDict
 from hydra.utils import get_original_cwd, to_absolute_path
@@ -124,6 +125,10 @@ def parse_args():
 
 
 def main():
+
+    # Set the process name to 'python'
+    setproctitle.setproctitle('python')
+
     args = parse_args()
     # e.g., experiments/LIBERO_SPATIAL/Multitask/BCRNNPolicy_seed100/
 
@@ -168,7 +173,7 @@ def main():
         print(f"[error] cannot find the checkpoint at {str(model_path)}")
         sys.exit(0)
 
-    cfg.folder = '/datasets/work/d61-csirorobotics/source/LIBERO' #get_libero_path("datasets")
+    cfg.folder = '/raid/work/dis023/csirorobotics/source/LIBERO' #get_libero_path("datasets")
     cfg.bddl_folder = get_libero_path("bddl_files")
     cfg.init_states_folder = get_libero_path("init_states")
 
@@ -266,7 +271,7 @@ def main():
                 "camera_widths": cfg.data.img_w,
             }
 
-            env_num = 5
+            env_num = 1  #20
             env = SubprocVectorEnv(
                 [lambda: OffScreenRenderEnv(**env_args) for _ in range(env_num)]
             )
@@ -298,28 +303,30 @@ def main():
                     data = raw_obs_to_tensor_obs(obs, task_emb, cfg)
                     actions = algo.policy.get_action(data)
                     obs, reward, done, info = env.step(actions)
-                    video_writer.append_vector_obs(
-                        obs, dones, camera_name="agentview_image"
-                    )
+                    copy_obs = copy.deepcopy(obs)
+                    # video_writer.append_vector_obs(
+                    #     obs, dones, camera_name="agentview_image"
+                    # )
 
                     #plot attention maps
                     # if steps==1:
-                    #     attention_maps(data, data["task_emb"], 'agentview_rgb', algo.policy, task_id, args, 'image_encoder')
+                    #     attention_maps(data, data["task_emb"], 'agentview_rgb', algo.policy, tadirectorysk_id, args, 'image_encoder')
                     #     attention_maps(data, data["task_emb"], 'eye_in_hand_rgb', algo.policy, task_id, args, 'image_encoder')
                     #     attention_maps(data, data["task_emb"], 'agentview_rgb', algo.policy, task_id, args, 'temp_transformer')
                     #     attention_maps(data, data["task_emb"], 'eye_in_hand_rgb', algo.policy, task_id, args, 'temp_transformer')
 
                     if steps%10==0:
-                        perturb_attn = PerturbationAttention(algo.policy.image_encoders['agentview_rgb']["encoder"], device=cfg.device)
+                        # perturb_attn = PerturbationAttention(algo.policy.image_encoders['agentview_rgb']["encoder"], device=cfg.device)
+                        perturb_attn = PerturbationAttention(algo.policy.temporal_transformer, device=cfg.device)
 
                         # data = algo.policy.preprocess_input(data, train_mode=False)
-                        attn_weights = perturb_attn(data)
-                        print("attention weights", attn_weights.shape)
+                        attn_weights = perturb_attn(data, algo.policy, 'agentview_rgb', 'transformer')
+                        # print("attention weights", attn_weights.shape)
 
                         attn_map = attn_weights[0, 0]  # Shape now (128, 128)
                         attn_map = np.flipud(attn_map)
-                        print("map", attn_map.shape)
-                        print("min max", np.min(attn_map), np.max(attn_map))
+                        # print("map", attn_map.shape)
+                        # print("min max", np.min(attn_map), np.max(attn_map))
 
                         attn_map = (attn_map - np.min(attn_map)) / (np.max(attn_map) - np.min(attn_map))
 
@@ -344,8 +351,33 @@ def main():
                         ax.axis('off')
 
                         # Save the combined image
-                        plt.savefig(f'attention_overlay_loadtask{args.load_task}_on_{task_id}_{steps}.png', bbox_inches='tight', pad_inches=0)
+                        image_path = os.path.join(directory,f'attention_overlay_loadtask{args.load_task}_on_{task_id}_{steps}.png')
+                        plt.savefig(image_path, bbox_inches='tight', pad_inches=0)
+
+                        fig.canvas.draw()
+                        overlay_image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                        overlay_image = overlay_image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
                         plt.close(fig)
+
+                        # Flip the image vertically (if needed) to match the original format
+                        overlay_image = np.flipud(overlay_image)
+
+                        # Normalize to [0, 1] range if required by the video writer (assuming normalization is needed)
+                        overlay_image = overlay_image / 255.0
+
+                        # print("copy obs", copy_obs[0].shape)
+
+                        # for key, value in copy_obs[0].items():
+                        #     if isinstance(value, np.ndarray):
+                        #         print(f"Key: {key}, Shape: {value.shape}")
+                        #     else:
+                        #         print(f"Key: {key}, Type: {type(value)}")
+
+                        copy_obs[0]['agentview_image'] = overlay_image
+
+                        # Append the observation to the video writer
+                        video_writer.append_vector_obs(copy_obs, dones, camera_name="agentview_image")
 
                         # # # Normalize the attention weights to range [0, 255]
                         # # attn_map = np.uint8(255 * attn_map / np.max(attn_map))
