@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=lib-cl
-#SBATCH --time=05:00:00
+#SBATCH --time=35:00:00
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --mem=64g
+#SBATCH --mem=128g
 #SBATCH --account=OD-236362
 #SBATCH --cpus-per-task=8
 
@@ -19,11 +19,13 @@
 # echo "MUJOCO_EGL_DEVICE_ID: $MUJOCO_EGL_DEVICE_ID"
 
 
-# python libero/lifelong/main.py benchmark_name=LIBERO_SPATIAL lifelong=er
+# python libero/lifelong/main.py benchmark_name=LIBERO_SPATIAL lifelong=er seed=100
+python libero/lifelong/main.py benchmark_name=LIBERO_OBJECT lifelong=er seed=200 policy=bc_transformer_policy_mheads
+
 # python libero/lifelong/evaluate.py --benchmark libero_spatial --task_id 9 --algo er --policy bc_transformer_policy --seed 10000 --load_task 0 --device_id 0
 
 # python libero/lifelong/evaluate_wtsne.py --benchmark libero_spatial --task_id 0 --algo er --policy bc_transformer_policy --seed 10000 \
 #     --load_task 0 --device_id 0 --folder 1 --save_videos
 
-# python libero/lifelong/evaluate_wtsne.py --benchmark libero_object --task_id 0 1 2 3 4 5 6 7 8 9 --algo er --policy bc_transformer_policy --seed 10000 \
-#     --load_task 7 --device_id 0 --folder 5
+# python libero/lifelong/evaluate_attn.py --benchmark libero_object --task_id 0 --algo er --policy bc_transformer_policy --seed 10000 \
+#     --load_task 4 --device_id 0 --folder 5 --save-videos

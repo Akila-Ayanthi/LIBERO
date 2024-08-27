@@ -85,6 +85,17 @@ class Sequential(nn.Module, metaclass=AlgoMeta):
         """
         self.current_task = task
 
+        print("Now the policy head is of length", len(self.policy.policy_head))
+
+        # Set requires_grad to False for all GMM policy heads except the current one
+        for i, head in enumerate(self.policy.policy_head):
+            if i != task:
+                for param in head.parameters():
+                    param.requires_grad = False
+            else:
+                for param in head.parameters():
+                    param.requires_grad = True
+
         # initialize the optimizer and scheduler
         self.optimizer = eval(self.cfg.train.optimizer.name)(
             self.policy.parameters(), **self.cfg.train.optimizer.kwargs

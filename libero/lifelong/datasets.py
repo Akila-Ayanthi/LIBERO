@@ -61,10 +61,11 @@ def get_dataset(
 
 class SequenceVLDataset(Dataset):
     def __init__(self, sequence_dataset, task_emb):
-        self.sequence_dataset = sequence_dataset
+        self.sequence_dataset, self.task_id = sequence_dataset
         self.task_emb = task_emb
         self.n_demos = self.sequence_dataset.n_demos
         self.total_num_sequences = self.sequence_dataset.total_num_sequences
+        
 
     def __len__(self):
         return len(self.sequence_dataset)
@@ -72,6 +73,7 @@ class SequenceVLDataset(Dataset):
     def __getitem__(self, idx):
         return_dict = self.sequence_dataset.__getitem__(idx)
         return_dict["task_emb"] = self.task_emb
+        return_dict["task_id"] = self.task_id
         return return_dict
 
 
@@ -131,9 +133,14 @@ class TruncatedSequenceDataset(Dataset):
     def __init__(self, sequence_dataset, buffer_size):
         self.sequence_dataset = sequence_dataset
         self.buffer_size = buffer_size
+        
 
     def __len__(self):
         return self.buffer_size
 
     def __getitem__(self, idx):
-        return self.sequence_dataset.__getitem__(idx)
+        return_dict = self.sequence_dataset.__getitem__(idx)
+        return_dict["task_id"] = self.sequence_dataset.__getitem__(idx)['task_id']
+        return return_dict
+
+    

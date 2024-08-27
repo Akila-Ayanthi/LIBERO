@@ -173,7 +173,7 @@ def main():
         print(f"[error] cannot find the checkpoint at {str(model_path)}")
         sys.exit(0)
 
-    cfg.folder = '/raid/work/dis023/csirorobotics/source/LIBERO' #get_libero_path("datasets")
+    cfg.folder = '/datasets/work/d61-csirorobotics/source/LIBERO' #get_libero_path("datasets")
     cfg.bddl_folder = get_libero_path("bddl_files")
     cfg.init_states_folder = get_libero_path("init_states")
 

@@ -115,7 +115,29 @@ class BasePolicy(nn.Module, metaclass=PolicyMeta):
     def compute_loss(self, data, reduction="mean"):
         data = self.preprocess_input(data, train_mode=True)
         dist = self.forward(data)
-        loss = self.policy_head.loss_fn(dist, data["actions"], reduction)
+
+        if torch.all(data['task_id'] == data['task_id'][0]):
+            # If all task IDs are the same, use the first task ID for indexing
+            task_id = data['task_id'][0].item()
+            loss = self.policy_head[task_id].loss_fn(dist, data["actions"], reduction)
+            # print("loss", loss)
+
+        else:
+            # If task IDs differ, process each task separately
+            losses = []
+            for i in range(len(data['task_id'])):
+                task_id = data['task_id'][i].item()
+                # dists.append(self.policy_head[task_id](x[i].unsqueeze(0)))
+                losses.append(self.policy_head[task_id].loss_fn(dist, data["actions"], reduction='raw'))
+            # Combine losses into a single tensor if needed
+            # print("losses", losses)
+            losses = torch.cat(losses, dim=0)
+            # print("losses after concat", losses)
+
+            loss = losses.mean() * self.policy_head[0].loss_coef
+
+            # print("loss", loss)
+# 
         return loss
 
     def reset(self):

@@ -88,8 +88,10 @@ def main(hydra_cfg):
         # add language to the vision dataset, hence we call vl_dataset
         task_description = benchmark.get_task(i).language
         descriptions.append(task_description)
-        manip_datasets.append(task_i_dataset)
+        manip_datasets.append((task_i_dataset, i))
 
+    # print("manip dataset", manip_datasets)
+    print(f"manip datasets 0 {manip_datasets[0]}")
     task_embs = get_task_embs(cfg, descriptions)
     benchmark.set_task_embs(task_embs)
 
@@ -111,11 +113,16 @@ def main(hydra_cfg):
             dataset = GroupedTaskDataset(
                 manip_datasets[i : i + gsz], task_embs[i : i + gsz]
             )
-            datasets.append(dataset)
+            datasets.append((dataset, i))
             n_demos.extend([x.n_demos for x in dataset.sequence_datasets])
             n_sequences.extend(
                 [x.total_num_sequences for x in dataset.sequence_datasets]
             )
+
+    print(f"datasets {datasets[0]}")
+
+    # for i in datasets[0]:
+    #     print(i)
 
     n_tasks = n_manip_tasks // gsz  # number of lifelong learning tasks
     print("\n=================== Lifelong Benchmark Information  ===================")

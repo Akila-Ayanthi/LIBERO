@@ -15,6 +15,8 @@ import torch
 import wandb
 import yaml
 import multiprocessing
+import h5py
+
 
 from easydict import EasyDict
 from hydra.utils import get_original_cwd, to_absolute_path
@@ -235,6 +237,8 @@ def main():
 
     test_loss = 0.0
 
+    dem_id=10
+
     # 2. evaluate success rate
     if args.algo == "multitask":
         save_folder = os.path.join(
@@ -249,7 +253,7 @@ def main():
 
     video_folder = os.path.join(
         args.save_dir,
-        f"{args.benchmark}_{args.algo}_{args.policy}_{args.seed}_load{args.load_task}_on{task_id}_videos",
+        f"{args.benchmark}_{args.task_id}_demo_{dem_id}_videos",
     )
 
     with Timer() as t, VideoWriter(video_folder, args.save_videos) as video_writer:
@@ -260,6 +264,18 @@ def main():
             "camera_heights": cfg.data.img_h,
             "camera_widths": cfg.data.img_w,
         }
+
+        dataset_path = "/datasets/work/d61-csirorobotics/source/LIBERO/libero_object/pick_up_the_alphabet_soup_and_place_it_in_the_basket_demo.hdf5"
+
+        demo_id = "demo_"+str(dem_id)
+
+        for i in h5py.File(dataset_path)["data"][demo_id]:
+            print(f'{i} and {len(i)}')
+
+        states = h5py.File(dataset_path)["data"][demo_id]["states"]
+        # print("states", states)
+        # print("state length", len(states))
+
 
         env_num = 1
         env = SubprocVectorEnv(
@@ -274,7 +290,14 @@ def main():
         )
         init_states = torch.load(init_states_path)
         indices = np.arange(env_num) % init_states.shape[0]
+        # print("indices", indices)
+        # selected_index=40
+        indices=[dem_id]
         init_states_ = init_states[indices]
+        # print("init_states before", init_states_, len(init_states_))
+
+        # init_states_ = [states[0]]
+        # print("init states", init_states_, len(init_states_))
 
         dones = [False] * env_num
         steps = 0
@@ -285,51 +308,64 @@ def main():
         for _ in range(5):  # simulate the physics without any actions
             env.step(np.zeros((env_num, 7)))
 
-        with torch.no_grad():
-            while steps < cfg.eval.max_steps:
-                steps += 1
-
-                data = raw_obs_to_tensor_obs(obs, task_emb, cfg)
-                actions = algo.policy.get_action(data)
-                print("actions", actions)
-                obs, reward, done, info = env.step(actions)
-                video_writer.append_vector_obs(
-                    obs, dones, camera_name="agentview_image"
+        
+        actions = h5py.File(dataset_path)["data"][demo_id]["actions"]
+        
+        
+        for action in actions:
+            # print("ACTIONS", action)
+            obs, reward, done, info = env.step([action])
+            env.render()
+            video_writer.append_vector_obs(
+                    obs, done, camera_name="agentview_image"
                 )
+            
+        # with torch.no_grad():
+        #     while steps < cfg.eval.max_steps:
+        #         steps += 1
 
-                # check whether succeed
-                for k in range(env_num):
-                    dones[k] = dones[k] or done[k]
-                if all(dones):
-                    break
+        #         data = raw_obs_to_tensor_obs(obs, task_emb, cfg)
+        #         actions = algo.policy.get_action(data)
+        #         obs, reward, done, info = env.step(actions)
+        #         video_writer.append_vector_obs(
+        #             obs, dones, camera_name="agentview_image"
+        #         )
+        #     env.close()
 
-            for k in range(env_num):
-                num_success += int(dones[k])
 
-        success_rate = num_success / env_num
-        # L = evaluate_loss(cfg, algo, benchmark, datasets[: task_id + 1])
-        S = evaluate_success(
-                cfg=cfg,
-                algo=algo,
-                benchmark=benchmark,
-                task_ids=list(range((task_id + 1) * gsz)),
-                result_summary=None,
-            )
-        print("Success rate", S)
-        env.close()
+    #             # check whether succeed
+    #             for k in range(env_num):
+    #                 dones[k] = dones[k] or done[k]
+    #             if all(dones):
+    #                 break
 
-        eval_stats = {
-            "loss": test_loss,
-            "success_rate": success_rate,
-        }
+    #         for k in range(env_num):
+    #             num_success += int(dones[k])
 
-        os.system(f"mkdir -p {args.save_dir}")
-        torch.save(eval_stats, save_folder)
-    print(
-        f"[info] finish for ckpt at {run_folder} in {t.get_elapsed_time()} sec for rollouts"
-    )
-    print(f"Results are saved at {save_folder}")
-    print(test_loss, success_rate)
+    #     success_rate = num_success / env_num
+    #     # L = evaluate_loss(cfg, algo, benchmark, datasets[: task_id + 1])
+    #     S = evaluate_success(
+    #             cfg=cfg,
+    #             algo=algo,
+    #             benchmark=benchmark,
+    #             task_ids=list(range((task_id + 1) * gsz)),
+    #             result_summary=None,
+    #         )
+    #     print("Success rate", S)
+    #     env.close()
+
+    #     eval_stats = {
+    #         "loss": test_loss,
+    #         "success_rate": success_rate,
+    #     }
+
+    #     os.system(f"mkdir -p {args.save_dir}")
+    #     torch.save(eval_stats, save_folder)
+    # print(
+    #     f"[info] finish for ckpt at {run_folder} in {t.get_elapsed_time()} sec for rollouts"
+    # )
+    # print(f"Results are saved at {save_folder}")
+    # print(test_loss, success_rate)
 
 
 if __name__ == "__main__":

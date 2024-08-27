@@ -61,7 +61,7 @@ class ER(Sequential):
                     batch_size=self.cfg.train.batch_size,
                     num_workers=self.cfg.train.num_workers,
                     sampler=RandomSampler(buf),
-                    persistent_workers=True,
+                    # persistent_workers=True,
                 )
             )
 
@@ -72,6 +72,7 @@ class ER(Sequential):
         if self.buffer is not None:
             buf_data = next(self.buffer)
             data = merge_datas(data, buf_data)
+
 
         data = self.map_tensor_to_device(data)
 

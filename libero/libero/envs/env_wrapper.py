@@ -2,6 +2,7 @@ import os
 import numpy as np
 import robosuite as suite
 import matplotlib.cm as cm
+import cv2
 
 from robosuite.utils.errors import RandomizationError
 
@@ -148,7 +149,22 @@ class ControlEnv:
         self.env.close()
         del self.env
 
+class DemoRenderEnv(ControlEnv):
+    """
+    For visualization and evaluation.
+    """
 
+    def __init__(self, **kwargs):
+        # This shouldn't be customized
+        kwargs["has_renderer"] = False
+        kwargs["has_offscreen_renderer"] = True
+        kwargs["render_camera"] = "frontview"
+
+        super().__init__(**kwargs)
+
+    def _get_observations(self):
+        return self.env._get_observations()
+    
 class OffScreenRenderEnv(ControlEnv):
     """
     For visualization and evaluation.
@@ -261,18 +277,4 @@ class SegmentationRenderEnv(OffScreenRenderEnv):
             return seg_img
 
 
-class DemoRenderEnv(ControlEnv):
-    """
-    For visualization and evaluation.
-    """
 
-    def __init__(self, **kwargs):
-        # This shouldn't be customized
-        kwargs["has_renderer"] = False
-        kwargs["has_offscreen_renderer"] = True
-        kwargs["render_camera"] = "frontview"
-
-        super().__init__(**kwargs)
-
-    def _get_observations(self):
-        return self.env._get_observations()

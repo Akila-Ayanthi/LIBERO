@@ -173,7 +173,7 @@ def main():
         print(f"[error] cannot find the checkpoint at {str(model_path)}")
         sys.exit(0)
 
-    cfg.folder = '/raid/work/dis023/csirorobotics/source/LIBERO' #/home/dis023/dgx #get_libero_path("datasets")
+    cfg.folder = '/datasets/work/d61-csirorobotics/source/LIBERO' #/home/dis023/dgx #get_libero_path("datasets")
     cfg.bddl_folder = get_libero_path("bddl_files")
     cfg.init_states_folder = get_libero_path("init_states")
 
@@ -276,7 +276,7 @@ def main():
                 "camera_widths": cfg.data.img_w,
             }
 
-            env_num = 20  #20
+            env_num = 5  #20
             env = SubprocVectorEnv(
                 [lambda: OffScreenRenderEnv(**env_args) for _ in range(env_num)]
             )
@@ -288,9 +288,19 @@ def main():
                 cfg.init_states_folder, task.problem_folder, task.init_states_file
             )
             init_states = torch.load(init_states_path)
+            print("init states", init_states.shape)
             indices = np.arange(env_num) % init_states.shape[0]
+            print("indices", indices)
             init_states_ = init_states[indices]
-            # print("init state", init_states_)
+            print("init state", init_states_)
+
+            # Assuming init_states_ is a NumPy array
+            init_states_1 = np.array(init_states_)  # Convert to NumPy array if it's not already
+
+            # Check if all rows are the same
+            first_state = init_states_1[0]
+            all_same = np.all(np.all(init_states_1 == first_state, axis=1))
+            print("All initial states are the same:", all_same)
 
             dones = [False] * env_num
             steps = 0
@@ -308,6 +318,7 @@ def main():
                     data = raw_obs_to_tensor_obs(obs, task_emb, cfg)
                     actions = algo.policy.get_action(data)
                     obs, reward, done, info = env.step(actions)
+                    # print("obs", obs)
                     copy_obs = copy.deepcopy(obs)
                     # video_writer.append_vector_obs(
                     #     obs, dones, camera_name="agentview_image"

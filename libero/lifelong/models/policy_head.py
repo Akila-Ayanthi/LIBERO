@@ -106,5 +106,7 @@ class GMMHead(nn.Module):
             return loss * self.loss_coef
         elif reduction == "sum":
             return loss.sum() * self.loss_coef
+        elif reduction == 'raw':
+            return loss
         else:
             raise NotImplementedError

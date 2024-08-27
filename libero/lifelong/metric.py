@@ -131,7 +131,7 @@ def evaluate_one_task_success(
                 steps += 1
 
                 data = raw_obs_to_tensor_obs(obs, task_emb, cfg)
-                actions = algo.policy.get_action(data)
+                actions = algo.policy.get_action(data, task_id)
 
                 obs, reward, done, info = env.step(actions)
 
