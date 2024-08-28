@@ -32,6 +32,7 @@ from libero.lifelong.utils import (
     torch_load_model,
     create_experiment_dir,
     get_task_embs,
+    count_parameters
 )
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="thop.profile")
@@ -178,6 +179,9 @@ def main(hydra_cfg):
     print(f"[info] start lifelong learning with algo {cfg.lifelong.algo}")
     GFLOPs, MParams = compute_flops(algo, datasets[0], cfg)
     print(f"[info] policy has {GFLOPs:.1f} GFLOPs and {MParams:.1f} MParams\n")
+
+    # num_params = count_parameters(algo)
+    # print("number of manual params", num_params)
 
     # save the experiment config file, so we can resume or replay later
     with open(os.path.join(cfg.experiment_dir, "config.json"), "w") as f:

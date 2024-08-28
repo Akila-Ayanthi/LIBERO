@@ -105,6 +105,15 @@ def compute_flops(algo, dataset, cfg):
     del model
     return GFLOPs, MParams
 
+def count_parameters(model):
+    total_params = 0
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(f"{name}: {param.numel()} parameters")
+            total_params += param.numel()
+    print(f"Total: {total_params} parameters")
+    return total_params
+
 
 def create_experiment_dir(cfg):
     prefix = "experiments"

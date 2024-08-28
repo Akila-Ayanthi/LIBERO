@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=lib-cl
-#SBATCH --time=35:00:00
+#SBATCH --time=48:00:00
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --mem=128g
@@ -20,7 +20,7 @@
 
 
 # python libero/lifelong/main.py benchmark_name=LIBERO_SPATIAL lifelong=er seed=100
-python libero/lifelong/main.py benchmark_name=LIBERO_OBJECT lifelong=er seed=200 policy=bc_transformer_policy_mheads
+python libero/lifelong/main.py benchmark_name=LIBERO_OBJECT lifelong=base seed=200 policy=bc_transformer_policy_mheads
 
 # python libero/lifelong/evaluate.py --benchmark libero_spatial --task_id 9 --algo er --policy bc_transformer_policy --seed 10000 --load_task 0 --device_id 0
 

@@ -275,13 +275,15 @@ class BCTransformerPolicyMHeads(BasePolicy):
             dropout=policy_cfg.transformer_dropout,
         )
 
-        policy_head_kwargs = policy_cfg.policy_head.network_kwargs
-        policy_head_kwargs.input_size = embed_size
-        policy_head_kwargs.output_size = shape_meta["ac_dim"]
+        
 
-        self.policy_head = []
+        self.policy_head = nn.ModuleList()
 
         for task in range(10):
+
+            policy_head_kwargs = policy_cfg.policy_head.network_kwargs
+            policy_head_kwargs.input_size = embed_size
+            policy_head_kwargs.output_size = shape_meta["ac_dim"]
 
         # print("policy_cfg.policy_head.network", policy_cfg.policy_head.network.device)
             policy_head = eval(policy_cfg.policy_head.network)(
@@ -294,7 +296,7 @@ class BCTransformerPolicyMHeads(BasePolicy):
         
         # self.policy_head.to(cfg.device)
 
-        print("Now the policy head is of length", len(self.policy_head))
+        # print("Now the policy head is of length", len(self.policy_head))
 
         self.latent_queue = []
         self.max_seq_len = policy_cfg.transformer_max_seq_len
@@ -359,7 +361,7 @@ class BCTransformerPolicyMHeads(BasePolicy):
 
         # print("task id", data['task_id'])
         if torch.all(data['task_id'] == data['task_id'][0]):
-            # If all task IDs are the same, use the first task ID for indexing
+            # print("If all task IDs are the same, use the first task ID for indexing")
             task_id = data['task_id'][0].item()
             dist = self.policy_head[task_id](x)
         else:
