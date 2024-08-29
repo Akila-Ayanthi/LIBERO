@@ -39,6 +39,12 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="thop.prof
 
 @hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(hydra_cfg):
+
+    print("Full Experiment 01")
+    # print("Experiment 02-01 with 3 tasks, Task order 01, alphabet_soup, cream_cheese, salad_dressing, freeze image encoders after task 0, task specific heads, no replay")
+    # print("Experiment 02-02 with 3 tasks, Task order 02, bbq_sauce, ketchup, tomato_sauce, freeze image encoders after task 0, task specific heads, no replay")
+    # print("Experiment 02-03 with 3 tasks, Task order 03, salad_dressing, butter, milk, freeze image encoders after task 0, task specific heads, no replay")
+
     # preprocessing
     yaml_config = OmegaConf.to_yaml(hydra_cfg)
     cfg = EasyDict(yaml.safe_load(yaml_config))
@@ -126,6 +132,7 @@ def main(hydra_cfg):
     #     print(i)
 
     n_tasks = n_manip_tasks // gsz  # number of lifelong learning tasks
+    # n_tasks = 3
     print("\n=================== Lifelong Benchmark Information  ===================")
     print(f" Name: {benchmark.name}")
     print(f" # Tasks: {n_manip_tasks // gsz}")

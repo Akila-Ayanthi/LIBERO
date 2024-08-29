@@ -85,15 +85,30 @@ class Sequential(nn.Module, metaclass=AlgoMeta):
         """
         self.current_task = task
 
+        #Freeze full backbone
+        if self.current_task > 0:
+            for param in self.policy.parameters():
+                param.requires_grad = False
+
+        # #Only freeze encoders
+        # if self.current_task > 0:
+        #     for param in self.policy.encoders.parameters():
+        #         param.requires_grad = False
 
         # Set requires_grad to False for all GMM policy heads except the current one
         for i, head in enumerate(self.policy.policy_head):
+
             if i != task:
                 for param in head.parameters():
                     param.requires_grad = False
             else:
                 for param in head.parameters():
                     param.requires_grad = True
+
+
+        # for name, param in self.policy.named_parameters():
+        #     if param.requires_grad:
+        #         print(f"Parameter: {name}, Shape: {param.shape}")
 
         # initialize the optimizer and scheduler
         self.optimizer = eval(self.cfg.train.optimizer.name)(

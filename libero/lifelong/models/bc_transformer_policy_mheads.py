@@ -279,7 +279,7 @@ class BCTransformerPolicyMHeads(BasePolicy):
 
         self.policy_head = nn.ModuleList()
 
-        for task in range(10):
+        for task in range(3):
 
             policy_head_kwargs = policy_cfg.policy_head.network_kwargs
             policy_head_kwargs.input_size = embed_size
