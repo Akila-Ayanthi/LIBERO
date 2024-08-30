@@ -39,6 +39,11 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="thop.prof
 
 @hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(hydra_cfg):
+
+    print("Running policy with multiple GMM heads with ER .... ")
+    # print("Experiment 01-01 with 3 tasks, Task order 01, alphabet_soup, cream_cheese, salad_dressing, task specific heads, with replay, no constraints")
+    # print("Experiment 02-02 with 3 tasks, Task order 02, bbq_sauce, ketchup, tomato_sauce, task specific heads, , with replay, no constraints")
+    # print("Experiment 01-03 with 3 tasks, Task order 03, salad_dressing, butter, milk, task specific heads,with replay, no constraints")
     # preprocessing
     yaml_config = OmegaConf.to_yaml(hydra_cfg)
     cfg = EasyDict(yaml.safe_load(yaml_config))
@@ -126,6 +131,7 @@ def main(hydra_cfg):
     #     print(i)
 
     n_tasks = n_manip_tasks // gsz  # number of lifelong learning tasks
+    # n_tasks = 3
     print("\n=================== Lifelong Benchmark Information  ===================")
     print(f" Name: {benchmark.name}")
     print(f" # Tasks: {n_manip_tasks // gsz}")

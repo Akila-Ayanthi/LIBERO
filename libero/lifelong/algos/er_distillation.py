@@ -32,7 +32,7 @@ def merge_datas(x, y):
         return torch.cat([x, y], 0)
 
 
-class ER(Sequential):
+class ERDistillation(Sequential):
     """
     The experience replay policy.
     """
@@ -67,6 +67,7 @@ class ER(Sequential):
 
     def end_task(self, dataset, task_id, benchmark):
         self.datasets.append(dataset)
+        self.policy.old_policy_head = self.policy.policy_head
 
     def observe(self, data):
         if self.buffer is not None:

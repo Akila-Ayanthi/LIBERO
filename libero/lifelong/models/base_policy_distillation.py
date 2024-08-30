@@ -44,14 +44,14 @@ class PolicyMeta(type):
         cls = super().__new__(meta, name, bases, class_dict)
 
         # List all policies that should not be registered here.
-        _unregistered_policies = ["BasePolicy"]
+        _unregistered_policies = ["BasePolicyDistillation"]
 
         if cls.__name__ not in _unregistered_policies:
             register_policy(cls)
         return cls
 
 
-class BasePolicy(nn.Module, metaclass=PolicyMeta):
+class BasePolicyDistillation(nn.Module, metaclass=PolicyMeta):
     def __init__(self, cfg, shape_meta):
         super().__init__()
         self.cfg = cfg
@@ -112,79 +112,28 @@ class BasePolicy(nn.Module, metaclass=PolicyMeta):
             )
             data["task_emb"] = data["task_emb"].squeeze(1)
         return data
-    
-    def compute_loss(self, data, reduction='mean'):
+
+    def compute_loss(self, data, reduction="mean"):
         data = self.preprocess_input(data, train_mode=True)
-        dists = self.forward(data)
+        current_dists, old_dists = self.forward(data)
 
-        losses = []
-        for i, (dist, indices) in enumerate(dists):
+        losses1, losses2 = [], []
+        loss1, loss2 = 0, 0
+        for i, (dist, indices) in enumerate(current_dists):
             loss_ = self.policy_head[i].loss_fn(dist, data['actions'][indices], reduction='mean')
-            losses.append(loss_)
+            losses1.append(loss_)
 
-        loss = sum(losses) / len(losses)
+        loss1 = sum(losses1) / len(losses1)
 
-        return loss
-            
-
-
-
-
-#     def compute_loss(self, data, reduction="mean"):
-#         data = self.preprocess_input(data, train_mode=True)
-#         dist = self.forward(data)
-
-#         # if torch.all(data['task_id'] == data['task_id'][0]):
-#         #     # If all task IDs are the same, use the first task ID for indexing
-#         #     task_id = data['task_id'][0].item()
-#         #     loss = self.policy_head[task_id].loss_fn(dist, data["actions"], reduction='mean')
-#         #     print("loss", loss)
-
-#         # else:
-#             # If task IDs differ, process each task separately
-
-#         losses = []
-#         for i in range(len(data['task_id'])):
-#             task_id = data['task_id'][i].item()
-#             losses.append(self.policy_head[task_id].loss_fn(dist[task_id], data["actions"], reduction='raw'))
-
-#         # Combine losses into a single tensor if needed
-#         losses = torch.cat(losses, dim=0)
-
-#         loss = losses.mean() * self.policy_head[0].loss_coef
-
-#             # print("loss", loss)
-# # 
-#         return loss
-    
-    # def compute_loss(self, data, task, reduction='mean'):
-    #     data = self.preprocess_input(data, train_mode=True)
-    #     dist_params = self.forward(data)
-    #     means, scales, logits = dist_params[0], dist_params[1], dist_params[2]
-
-    #     compo = D.Normal(loc=means, scale=scales)
-    #     compo = D.Independent(compo, 1)
-    #     mix = D.Categorical(logits=logits)
-    #     gmm = D.MixtureSameFamily(
-    #         mixture_distribution=mix, component_distribution=compo
-    #     )
-
-    #     loss = self.policy_head[data['task_id']].loss_fn(gmm, data['actions'], reduction)
-    #     print("loss", loss)
-
-    #     # if task==0:
-    #     #     loss = self.policy_head[task].loss_fn(dist, data['actions'], reduction)
-    #     # else:
-    #     #     losses = []
-    #     #     for i in range(len(data['task_id'])):
-    #     #         task_id = data['task_id'][i].item()
-    #     #         # dists.append(self.policy_head[task_id](x[i].unsqueeze(0)))
-    #     #         losses.append(self.policy_head[task_id].loss_fn(dist[task_id], data["actions"][i], reduction='raw'))
-
-    #     #     losses = torch.cat(losses, dim=0)
-
-    #     #     loss = losses.mean() * self.policy_head[0].loss_coef
-    #     return loss
+        if len(old_dists)!=0:
+            for i, ((c_dist, c_indices), (o_dist, o_indices)) in enumerate(zip(current_dists, old_dists)):
+                if torch.equal(c_indices, o_indices):
+                    loss_ = self.policy_head[i].distill_loss_fn(o_dist, c_dist, data['actions'][indices])
+                losses2.append(loss_)
+        
+            loss2 = sum(losses2)/len(losses2)
+        
+        return loss1 + loss2
 
 
     def reset(self):

@@ -120,7 +120,7 @@ class Sequential(nn.Module, metaclass=AlgoMeta):
         """
         data = self.map_tensor_to_device(data)
         self.optimizer.zero_grad()
-        loss = self.policy.compute_loss(data)
+        loss = self.policy.compute_loss(data, self.current_task)
         (self.loss_scale * loss).backward()
         if self.cfg.train.grad_clip is not None:
             grad_norm = nn.utils.clip_grad_norm_(
@@ -132,11 +132,10 @@ class Sequential(nn.Module, metaclass=AlgoMeta):
     def eval_observe(self, data):
         data = self.map_tensor_to_device(data)
         with torch.no_grad():
-            loss = self.policy.compute_loss(data)
+            loss = self.policy.compute_loss(data, self.current_task)
         return loss.item()
 
     def learn_one_task(self, dataset, task_id, benchmark, result_summary):
-
         self.start_task(task_id)
 
         # recover the corresponding manipulation task ids

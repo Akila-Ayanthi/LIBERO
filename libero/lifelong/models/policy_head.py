@@ -97,6 +97,8 @@ class GMMHead(nn.Module):
         )
         return gmm
 
+        # return means, scales, logits
+
     def loss_fn(self, gmm, target, reduction="mean"):
         log_probs = gmm.log_prob(target)
         loss = -log_probs
@@ -110,3 +112,10 @@ class GMMHead(nn.Module):
             return loss
         else:
             raise NotImplementedError
+        
+    def distill_loss_fn(self, old_gmm, new_gmm, target, reduction='mean'):
+        old_log_probs = old_gmm.log_prob(target)
+        new_log_probs = new_gmm.log_prob(target)
+
+        loss = torch.nn.functional.kl_div(new_log_probs, old_log_probs, reduction=reduction)
+        return loss

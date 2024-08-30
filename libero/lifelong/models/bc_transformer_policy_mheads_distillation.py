@@ -9,7 +9,8 @@ import torch.distributions as D
 from libero.lifelong.models.modules.rgb_modules import *
 from libero.lifelong.models.modules.language_modules import *
 from libero.lifelong.models.modules.transformer_modules import *
-from libero.lifelong.models.base_policy import BasePolicy
+# from libero.lifelong.models.base_policy import BasePolicy
+from libero.lifelong.models.base_policy_distillation import BasePolicyDistillation
 from libero.lifelong.models.policy_head import *
 
 
@@ -213,7 +214,7 @@ class PerturbationAttention:
 ###############################################################################
 
 
-class BCTransformerPolicyMHeads(BasePolicy):
+class BCTransformerPolicyMHeadsDistillation(BasePolicyDistillation):
     """
     Input: (o_{t-H}, ... , o_t)
     Output: a_t or distribution of a_t
@@ -294,7 +295,8 @@ class BCTransformerPolicyMHeads(BasePolicy):
 
             self.policy_head.append(policy_head.to(cfg.device))
         
-        # self.policy_head.to(cfg.device)
+        
+        self.old_policy_head = None
 
         # print("Now the policy head is of length", len(self.policy_head))
 
@@ -347,118 +349,13 @@ class BCTransformerPolicyMHeads(BasePolicy):
         encoded = torch.cat(encoded, -2)  # (B, T, num_modalities, E)
         return encoded
 
-    # def forward(self, data, returnt='None'):
-
-    #     x = self.spatial_encode(data)
-
-    #     if returnt == 'spatial_feats':
-    #         return x
-        
-    #     x = self.temporal_encode(x)
-
-    #     if returnt=='feats':
-    #         return x
-
-    #     # print("task id", data['task_id'])
-    #     # if torch.all(data['task_id'] == data['task_id'][0]):
-    #     #     # print("If all task IDs are the same, use the first task ID for indexing")
-    #     #     task_id = data['task_id'][0].item()
-    #     #     dist = self.policy_head[task_id](x)
-    #     #     return dist
-    #     # else:
-    #         # If task IDs differ, process each task separately
-    #     dists = []
-    #     for i in range(len(data['task_id'])):
-    #         task_id = data['task_id'][i].item()
-    #         dist = self.policy_head[task_id](x[i].unsqueeze(0))
-    #         dists.append(dist)
-    #     return dists
-
-
-    #         # # Assume dists is a list of MixtureSameFamily distributions
-    #         # logits_list = []
-    #         # loc_list = []
-    #         # scale_list = []
-
-    #         # for mixture in dists:
-    #         #     logits_list.append(mixture.mixture_distribution.logits)
-    #         #     loc_list.append(mixture.component_distribution.base_dist.loc)
-    #         #     scale_list.append(mixture.component_distribution.base_dist.scale)
-
-    #         # # Concatenate along the batch dimension (first dimension)
-    #         # combined_logits = torch.cat(logits_list, dim=0)  # Shape: [32, 10, 5]
-    #         # combined_loc = torch.cat(loc_list, dim=0)        # Shape: [32, 10, 5, 7]
-    #         # combined_scale = torch.cat(scale_list, dim=0)    # Shape: [32, 10, 5, 7]
-
-    #         # # Recreate the Categorical and Independent(Normal) distributions
-    #         # combined_categorical = D.Categorical(logits=combined_logits)
-    #         # combined_normal = D.Normal(loc=combined_loc, scale=combined_scale)
-    #         # combined_independent = D.Independent(combined_normal, reinterpreted_batch_ndims=1)
-
-    #         # # Create the final MixtureSameFamily distribution
-    #         # dist = D.MixtureSameFamily(combined_categorical, combined_independent)
-          
-    
-
-    # def forward(self, data, returnt='None'):
-    #     x = self.spatial_encode(data)
-        
-    #     x = self.temporal_encode(x)
-
-    #     unique_task_ids = torch.unique(data['task_id'])
-
-    #     dists = []
-
-    #     dist = self.policy_head[data['task_id'].item()](x)
-    #     print(dist)
-
-        # for task_id in unique_task_ids:
-        #     # Find indices of data points that belong to the current task_id
-        #     indices = (data['task_id'] == task_id).nonzero(as_tuple=True)[0]
-            
-        #     # Gather the corresponding inputs for this task ID
-        #     relevant_inputs = x[indices]
-            
-        #     dist = self.policy_head[task_id.item()](relevant_inputs)
-
-        #     dists.append((dist, indices))
-
-            # # Process the grouped inputs through the relevant policy head
-            # dist_mean, dist_scale, dist_logits = self.policy_head[task_id.item()](relevant_inputs)
-            # logits_expanded = dist_logits.unsqueeze(-1)
-
-            # print("mean", dist_mean.shape)
-            # print("scale", dist_scale.shape)
-            # print("logits", logits_expanded.shape)
-
-            # # Store the results and their original indices
-            # params = torch.cat([dist_mean, dist_scale, logits_expanded], dim=0)
-            # print("params", params.shape)
-            # dists.append((params, indices))
-
-
-
-        # # Initialize an output tensor to store the results in the original order
-        # output_dist = torch.zeros_like(x)
-        # print("output dist", output_dist.shape)
-
-        # # Populate the output tensor with the computed distributions in their original order
-        # for dist, indices in dists:
-        #     for i, idx in enumerate(indices):
-        #         output_dist[0][idx] = dist[0][i]
-
-        # print("output dist", output_dist)
-
-        # return output_dist
-    
-
     def forward (self, data, returnt='None'):
         x = self.spatial_encode(data)
         x = self.temporal_encode(x)
 
         unique_task_ids = torch.unique(data['task_id'])
 
-        dists = []
+        current_dists, old_dists = [], []
 
         for task_id in unique_task_ids:
             #  Find indices of data points that belong to the current task_id
@@ -467,11 +364,15 @@ class BCTransformerPolicyMHeads(BasePolicy):
             # Gather the corresponding inputs for this task ID
             relevant_inputs = x[indices]
             
-            dist = self.policy_head[task_id.item()](relevant_inputs)
+            current_dist = self.policy_head[task_id.item()](relevant_inputs)
+            current_dists.append((current_dist, indices))
 
-            dists.append((dist, indices))
+            if task_id>0:
+                old_dist = self.old_policy_head[task_id.item()](relevant_inputs)
+                old_dists.append((old_dist, indices))
 
-        return dists
+        return current_dists, old_dists
+
         
 
     def get_action(self, data, task_id):
